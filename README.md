@@ -65,6 +65,32 @@ Contract Builder CBA is a full-stack web application built with Next.js that tra
 - Cloud-based storage enables access from anywhere
 - Type-safe development reduces bugs and improves maintainability
 
+## Project Structure
+
+```
+contract_builder_cba/          # Main application directory
+├── app/                       # Next.js app directory
+│   ├── api/                   # API routes
+│   │   └── contracts/         # Contract CRUD endpoints
+│   ├── layout.tsx             # Root layout
+│   └── page.tsx               # Home page
+├── components/                # React components
+│   ├── CanvasEditor.tsx       # Main canvas editor
+│   ├── CanvasToolbox.tsx      # Element toolbox
+│   ├── CanvasWorkspace.tsx    # Canvas workspace
+│   ├── CanvasPropertiesPanel.tsx  # Properties editor
+│   ├── ContractForm.tsx       # Contract metadata form
+│   └── ContractPreview.tsx    # Contract preview
+├── lib/                       # Utility libraries
+│   ├── prisma.ts              # Prisma client
+│   └── contract-utils.ts      # Contract helpers
+├── prisma/                    # Database schema
+│   └── schema.prisma          # Prisma schema
+├── types/                     # TypeScript types
+│   └── contract.ts            # Contract type definitions
+└── public/                    # Static assets
+```
+
 ## Getting Started
 
 ### Prerequisites
@@ -76,6 +102,9 @@ Contract Builder CBA is a full-stack web application built with Next.js that tra
 ### Installation
 
 ```bash
+# Navigate to project directory
+cd contract_builder_cba
+
 # Install dependencies
 npm install
 
@@ -101,42 +130,16 @@ npm run dev
 
 ### Database Setup
 
-See [PRISMA_SETUP.md](./PRISMA_SETUP.md) for detailed Prisma configuration instructions.
+See [contract_builder_cba/PRISMA_SETUP.md](./contract_builder_cba/PRISMA_SETUP.md) for detailed Prisma configuration instructions.
 
-See [AWS_RDS_SETUP.md](./AWS_RDS_SETUP.md) for AWS RDS PostgreSQL setup guide.
-
-## Project Structure
-
-```
-contract_builder_cba/
-├── app/                      # Next.js app directory
-│   ├── api/                  # API routes
-│   │   └── contracts/        # Contract CRUD endpoints
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Home page
-├── components/               # React components
-│   ├── CanvasEditor.tsx      # Main canvas editor
-│   ├── CanvasToolbox.tsx     # Element toolbox
-│   ├── CanvasWorkspace.tsx   # Canvas workspace
-│   ├── CanvasPropertiesPanel.tsx  # Properties editor
-│   ├── ContractForm.tsx      # Contract metadata form
-│   └── ContractPreview.tsx   # Contract preview
-├── lib/                      # Utility libraries
-│   ├── prisma.ts             # Prisma client
-│   └── contract-utils.ts     # Contract helpers
-├── prisma/                   # Database schema
-│   └── schema.prisma         # Prisma schema
-├── types/                    # TypeScript types
-│   └── contract.ts           # Contract type definitions
-└── public/                   # Static assets
-```
+See [contract_builder_cba/AWS_RDS_SETUP.md](./contract_builder_cba/AWS_RDS_SETUP.md) for AWS RDS PostgreSQL setup guide.
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture and design decisions
-- [CANVAS_EDITOR.md](./CANVAS_EDITOR.md) - Canvas editor implementation details
-- [PRISMA_SETUP.md](./PRISMA_SETUP.md) - Database and Prisma configuration
-- [AWS_RDS_SETUP.md](./AWS_RDS_SETUP.md) - AWS RDS setup instructions
+- [ARCHITECTURE.md](./contract_builder_cba/ARCHITECTURE.md) - System architecture and design decisions
+- [CANVAS_EDITOR.md](./contract_builder_cba/CANVAS_EDITOR.md) - Canvas editor implementation details
+- [PRISMA_SETUP.md](./contract_builder_cba/PRISMA_SETUP.md) - Database and Prisma configuration
+- [AWS_RDS_SETUP.md](./contract_builder_cba/AWS_RDS_SETUP.md) - AWS RDS setup instructions
 
 ## Deployment
 
@@ -146,7 +149,8 @@ contract_builder_cba/
 # Install Vercel CLI
 npm i -g vercel
 
-# Deploy
+# Deploy from contract_builder_cba directory
+cd contract_builder_cba
 vercel
 ```
 
