@@ -9,6 +9,14 @@ datasource db {
   provider = "postgresql"
 }
 
+// Enable uuid-ossp extension for uuid_generate_v4()
+model extensions {
+  @@ignore
+}
+
+// Migration to enable uuid-ossp
+// Run this manually if needed: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 model EmploymentContract {
   id              String   @id @default(uuid())
   contractNumber  String   @unique
@@ -139,7 +147,7 @@ model companies {
 }
 
 model vessels {
-  id                                   String                                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                                   String                                 @id @default(uuid()) @db.Uuid
   name                                 String                                 @db.VarChar(255)
   imo_number                           String                                 @unique @db.VarChar(20)
   call_sign                            String?                                @db.VarChar(20)
@@ -282,7 +290,7 @@ model seafarer_contract_version_schedule {
 }
 
 model seafarer_contract_version_overrides {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String    @id @default(uuid()) @db.Uuid
   seafarer_id     String    @db.Uuid
   vessel_id       String    @db.Uuid
   contract_row_id String    @db.Uuid
