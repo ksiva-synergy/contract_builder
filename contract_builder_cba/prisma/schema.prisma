@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EmploymentContract {
+  id              String   @id @default(uuid())
+  contractNumber  String   @unique
+  effectiveFrom   String
+  
+  // Personal Details
+  fullName        String
+  dateOfBirth     String
+  age             Int
+  nationality     String
+  cdcNumber       String
+  address         String   @db.Text
+  
+  // Position Details
+  crewCode        String
+  position        String
+  placeOfBirth    String
+  ppNumber        String
+  
+  // Vessel Details
+  vesselName      String
+  imoNumber       String
+  registeredOwner String
+  certificateOfRegistry String
+  portOfRegistry  String
+  shipownerAddress String   @db.Text
+  managerAddress  String   @db.Text
+  vesselOwnerAddress String @db.Text
+  
+  // Contract Terms
+  contractTerm    String
+  placeOfEngagement String
+  contractStartDate String
+  contractExpiryDate String
+  
+  // Wage Breakdown
+  basicWages      Decimal  @db.Decimal(10, 2)
+  employerSpecialAllowance Decimal @db.Decimal(10, 2)
+  fixedOvertime   Decimal  @db.Decimal(10, 2)
+  leavePay        Decimal  @db.Decimal(10, 2)
+  subsistenceAllowance Decimal @db.Decimal(10, 2)
+  specialAllowance Decimal @db.Decimal(10, 2)
+  uniformAllowance Decimal @db.Decimal(10, 2)
+  totalMonthlySalary Decimal @db.Decimal(10, 2)
+  netMonthlySalary Decimal @db.Decimal(10, 2)
+  
+  // Signature & Authentication
+  signature       String?  @db.Text
+  email           String?
+  place           String?
+  
+  // Relations
+  otherEarnings   OtherEarning[]
+  deductions      Deduction[]
+  salaryRevisions SalaryRevision[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([contractNumber])
+  @@index([vesselName])
+}
+
+model OtherEarning {
+  id          String   @id @default(uuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  date        String
+  
+  contractId  String
+  contract    EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([contractId])
+}
+
+model Deduction {
+  id          String   @id @default(uuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  date        String
+  
+  contractId  String
+  contract    EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([contractId])
+}
+
+model SalaryRevision {
+  id            String   @id @default(uuid())
+  sno           Int
+  effectiveFrom String
+  salary        Decimal  @db.Decimal(10, 2)
+  remarks       String   @db.Text
+  
+  contractId    String
+  contract      EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([contractId])
+}
