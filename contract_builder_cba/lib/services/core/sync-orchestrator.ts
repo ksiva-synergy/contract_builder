@@ -1,10 +1,8 @@
 import 'server-only';
 import { log } from '@/lib/utils/debug-config';
 import { SACService } from '@/lib/services/contracts/sac-service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
-
-const prisma = new PrismaClient();
 
 export interface SyncResult {
   success: boolean;

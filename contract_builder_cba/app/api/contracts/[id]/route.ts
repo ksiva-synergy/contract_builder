@@ -48,6 +48,7 @@ export async function PUT(
       data: {
         contractNumber: body.contractNumber,
         effectiveFrom: body.effectiveFrom,
+        status: body.status || undefined,
         fullName: body.personalDetails.fullName,
         dateOfBirth: body.personalDetails.dateOfBirth,
         age: body.personalDetails.age,
@@ -79,6 +80,10 @@ export async function PUT(
         uniformAllowance: body.wageBreakdown.uniformAllowance,
         totalMonthlySalary: body.wageBreakdown.totalMonthlySalary,
         netMonthlySalary: body.wageBreakdown.netMonthlySalary,
+        signature: body.signature || undefined,
+        email: body.email || undefined,
+        place: body.place || undefined,
+        canvasElements: body.canvasElements || undefined,
       },
     });
     

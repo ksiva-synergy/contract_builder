@@ -17,11 +17,93 @@ model extensions {
 // Migration to enable uuid-ossp
 // Run this manually if needed: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+enum UserRole {
+  ADMIN
+  INITIATOR
+  SIGNER
+  REVIEWER
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING_REVIEW
+  PENDING_SIGNING
+  PARTIALLY_SIGNED
+  SIGNED
+  CANCELLED
+}
+
+enum AssignmentRole {
+  SIGNER
+  REVIEWER
+}
+
+enum SigningOrder {
+  SEQUENTIAL
+  PARALLEL
+}
+
+enum SignatureType {
+  DRAW
+  TYPE
+  UPLOAD
+  DSC
+  AADHAAR
+}
+
+enum AuditAction {
+  CREATED
+  VIEWED
+  EDITED
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  RETURNED
+  SIGNED
+  VERIFIED
+  EXPORTED
+  STATUS_CHANGED
+  ASSIGNMENT_ADDED
+  CANCELLED
+  SEALED
+  DISTRIBUTED
+  OTP_VERIFIED
+  TOKEN_ACCESSED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  phone        String?
+  role         UserRole @default(INITIATOR)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdContracts    EmploymentContract[] @relation("ContractCreator")
+  contractAssignments ContractAssignment[]
+  signatures          Signature[]
+  auditLogs           AuditLog[]
+  createdWorkflows    WorkflowTemplate[]   @relation("WorkflowCreator")
+  uploadedAttachments DocumentAttachment[] @relation("AttachmentUploader")
+
+  @@index([email])
+  @@index([role])
+}
+
 model EmploymentContract {
-  id              String   @id @default(uuid())
-  contractNumber  String   @unique
+  id              String         @id @default(uuid())
+  contractNumber  String         @unique
   effectiveFrom   String
-  
+  status          ContractStatus @default(DRAFT)
+  signingOrder    SigningOrder    @default(PARALLEL)
+  dataHash        String?
+
+  createdById     String?
+  createdBy       User?          @relation("ContractCreator", fields: [createdById], references: [id])
+
   // Personal Details
   fullName        String
   dateOfBirth     String
@@ -29,13 +111,13 @@ model EmploymentContract {
   nationality     String
   cdcNumber       String
   address         String   @db.Text
-  
+
   // Position Details
   crewCode        String
   position        String
   placeOfBirth    String
   ppNumber        String
-  
+
   // Vessel Details
   vesselName      String
   imoNumber       String
@@ -45,13 +127,13 @@ model EmploymentContract {
   shipownerAddress String   @db.Text
   managerAddress  String   @db.Text
   vesselOwnerAddress String @db.Text
-  
+
   // Contract Terms
   contractTerm    String
   placeOfEngagement String
   contractStartDate String
   contractExpiryDate String
-  
+
   // Wage Breakdown
   basicWages      Decimal  @db.Decimal(10, 2)
   employerSpecialAllowance Decimal @db.Decimal(10, 2)
@@ -62,22 +144,136 @@ model EmploymentContract {
   uniformAllowance Decimal @db.Decimal(10, 2)
   totalMonthlySalary Decimal @db.Decimal(10, 2)
   netMonthlySalary Decimal @db.Decimal(10, 2)
-  
-  // Signature & Authentication
+
+  // Signature & Authentication (legacy)
   signature       String?  @db.Text
   email           String?
   place           String?
-  
+
+  // Canvas data
+  canvasElements  Json?
+
+  // Template reference
+  templateId      String?
+
+  // Sealing
+  sealedFilePath  String?
+  sealedAt        DateTime?
+  sealedHash      String?
+
   // Relations
-  otherEarnings   OtherEarning[]
-  deductions      Deduction[]
-  salaryRevisions SalaryRevision[]
-  
+  otherEarnings      OtherEarning[]
+  deductions         Deduction[]
+  salaryRevisions    SalaryRevision[]
+  versions           ContractVersion[]
+  assignments        ContractAssignment[]
+  contractSignatures Signature[]            @relation("ContractSignatures")
+  auditLogs          AuditLog[]
+  attachments        DocumentAttachment[]
+  estamps            EStamp[]
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   @@index([contractNumber])
   @@index([vesselName])
+  @@index([status])
+  @@index([createdById])
+}
+
+model ContractAssignment {
+  id              String         @id @default(uuid())
+  contractId      String
+  contract        EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation(fields: [userId], references: [id])
+  role            AssignmentRole
+  orderIndex      Int            @default(0)
+  isCompleted     Boolean        @default(false)
+  completedAt     DateTime?
+  token           String?        @unique
+  tokenExpiresAt  DateTime?
+  otpCode         String?
+  otpExpiresAt    DateTime?
+  signatureMethod String?
+  createdAt       DateTime       @default(now())
+
+  @@unique([contractId, userId, role])
+  @@index([contractId])
+  @@index([userId])
+  @@index([token])
+}
+
+model Signature {
+  id              String        @id @default(uuid())
+  contractId      String
+  contract        EmploymentContract @relation("ContractSignatures", fields: [contractId], references: [id], onDelete: Cascade)
+  signerId        String
+  signer          User          @relation(fields: [signerId], references: [id])
+  signatureData   String        @db.Text
+  signatureType   SignatureType
+  signatureMethod String?
+  dataHash        String
+  ipAddress       String?
+  userAgent       String?
+  signedAt        DateTime      @default(now())
+
+  @@index([contractId])
+  @@index([signerId])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  contractId String?
+  contract   EmploymentContract? @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  details    Json?
+  ipAddress  String?
+  timestamp  DateTime    @default(now())
+
+  @@index([contractId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model ContractVersion {
+  id          String   @id @default(uuid())
+  contractId  String
+  contract    EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  version     Int
+  data        Json
+  createdAt   DateTime @default(now())
+
+  @@index([contractId])
+}
+
+model ContractTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  description     String   @db.Text
+  category        String
+  canvasElements  Json?
+  defaultValues   Json?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+}
+
+model Clause {
+  id          String   @id @default(uuid())
+  title       String
+  content     String   @db.Text
+  category    String
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
 }
 
 model OtherEarning {
@@ -86,12 +282,12 @@ model OtherEarning {
   amount      Decimal  @db.Decimal(10, 2)
   currency    String   @default("USD")
   date        String
-  
+
   contractId  String
   contract    EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([contractId])
 }
 
@@ -101,12 +297,12 @@ model Deduction {
   amount      Decimal  @db.Decimal(10, 2)
   currency    String   @default("USD")
   date        String
-  
+
   contractId  String
   contract    EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([contractId])
 }
 
@@ -116,13 +312,59 @@ model SalaryRevision {
   effectiveFrom String
   salary        Decimal  @db.Decimal(10, 2)
   remarks       String   @db.Text
-  
+
   contractId    String
   contract      EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  
+
   createdAt     DateTime @default(now())
-  
+
   @@index([contractId])
+}
+
+model WorkflowTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  steps       Json
+  createdById String
+  createdBy   User     @relation("WorkflowCreator", fields: [createdById], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
+}
+
+model DocumentAttachment {
+  id           String             @id @default(uuid())
+  contractId   String
+  contract     EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  fileName     String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  uploadedById String
+  uploadedBy   User               @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@index([contractId])
+}
+
+model EStamp {
+  id                 String             @id @default(uuid())
+  contractId         String
+  contract           EmploymentContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  stampCertificateNo String
+  stampDutyAmount    Decimal            @db.Decimal(12, 2)
+  stampType          String
+  jurisdiction       String
+  stampDate          DateTime
+  isVerified         Boolean            @default(false)
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+
+  @@index([contractId])
+  @@index([stampCertificateNo])
 }
 
 // Replicated from portage_bill_v1
@@ -139,7 +381,7 @@ model companies {
   is_active           Boolean?             @default(true)
   created_at          DateTime?            @default(now()) @db.Timestamptz(6)
   updated_at          DateTime?            @default(now()) @db.Timestamptz(6)
-  
+
   seafarers           seafarers[]
   vessels             vessels[]
 
@@ -159,7 +401,7 @@ model vessels {
   created_at                           DateTime?                              @default(now()) @db.Timestamptz(6)
   updated_at                           DateTime?                              @default(now()) @db.Timestamptz(6)
   financial_year_start_month           Int?                                   @default(1) @db.SmallInt
-  
+
   contracts                            contracts[]
   seafarers                            seafarers[]
   companies                            companies?                             @relation(fields: [company_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -189,7 +431,7 @@ model seafarers {
   sea_experience_id                    BigInt?
   contract_id                          BigInt?
   seafarer_id                          BigInt?
-  
+
   contracts                            contracts[]
   companies                            companies?                             @relation(fields: [company_id], references: [id])
   vessels                              vessels?                               @relation(fields: [vessel_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -245,7 +487,7 @@ model contracts {
   source_created_at                    DateTime?                              @db.Timestamptz(6)
   source_updated_at                    DateTime?                              @db.Timestamptz(6)
   fivetran_synced_at                   DateTime?                              @db.Timestamptz(6)
-  
+
   seafarers                            seafarers?                             @relation(fields: [seafarer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_contracts_seafarer_id")
   vessels                              vessels?                               @relation(fields: [vessel_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_contracts_vessel_id")
   seafarer_contract_version_overrides  seafarer_contract_version_overrides[]

@@ -1,225 +1,219 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, RefObject } from 'react';
-import { CanvasElement } from './CanvasEditor';
+import { useState, useCallback, useRef } from "react";
+import type { CanvasElement } from "./CanvasEditor";
 
 interface CanvasWorkspaceProps {
   elements: CanvasElement[];
   selectedElement: string | null;
   zoom: number;
   pan: { x: number; y: number };
+  showGrid: boolean;
+  snapValue: (val: number) => number;
   onSelectElement: (id: string | null) => void;
   onUpdateElement: (id: string, updates: Partial<CanvasElement>) => void;
   onDeleteElement: (id: string) => void;
-  canvasRef: RefObject<HTMLDivElement>;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
 }
+
+const PAGE_WIDTH = 794;
+const PAGE_HEIGHT = 1123;
 
 export default function CanvasWorkspace({
   elements,
   selectedElement,
   zoom,
   pan,
+  showGrid,
+  snapValue,
   onSelectElement,
   onUpdateElement,
   onDeleteElement,
   canvasRef,
 }: CanvasWorkspaceProps) {
-  const [draggingElement, setDraggingElement] = useState<string | null>(null);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [resizing, setResizing] = useState<{ id: string; handle: string } | null>(null);
+  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const [resizing, setResizing] = useState<{ id: string; handle: string; startX: number; startY: number; startW: number; startH: number; startEX: number; startEY: number } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' && selectedElement) {
-        onDeleteElement(selectedElement);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElement, onDeleteElement]);
-
-  const handleMouseDown = (e: React.MouseEvent, elementId: string) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, id: string) => {
+    if (editingId === id) return;
     e.stopPropagation();
-    onSelectElement(elementId);
-    setDraggingElement(elementId);
-    const element = elements.find(el => el.id === elementId);
-    if (element) {
-      setDragStart({
-        x: e.clientX - element.x * zoom,
-        y: e.clientY - element.y * zoom,
-      });
-    }
-  };
+    const el = elements.find((el) => el.id === id);
+    if (!el || el.locked) return;
+    onSelectElement(id);
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = (e.clientX - rect.left) / zoom - el.x;
+    const y = (e.clientY - rect.top) / zoom - el.y;
+    setDragging({ id, offsetX: x, offsetY: y });
+  }, [elements, zoom, canvasRef, onSelectElement, editingId]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingElement) {
-      const newX = (e.clientX - dragStart.x) / zoom;
-      const newY = (e.clientY - dragStart.y) / zoom;
-      onUpdateElement(draggingElement, { x: newX, y: newY });
-    }
-  };
+  const handleResizeDown = useCallback((e: React.MouseEvent, id: string, handle: string) => {
+    e.stopPropagation();
+    const el = elements.find((el) => el.id === id);
+    if (!el) return;
+    setResizing({
+      id,
+      handle,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: el.width,
+      startH: el.height,
+      startEX: el.x,
+      startEY: el.y,
+    });
+  }, [elements]);
 
-  const handleMouseUp = () => {
-    setDraggingElement(null);
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (dragging) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = snapValue((e.clientX - rect.left) / zoom - dragging.offsetX);
+      const y = snapValue((e.clientY - rect.top) / zoom - dragging.offsetY);
+      onUpdateElement(dragging.id, { x: Math.max(0, x), y: Math.max(0, y) });
+    }
+    if (resizing) {
+      const dx = (e.clientX - resizing.startX) / zoom;
+      const dy = (e.clientY - resizing.startY) / zoom;
+      const updates: Partial<CanvasElement> = {};
+      if (resizing.handle.includes("e")) updates.width = Math.max(30, snapValue(resizing.startW + dx));
+      if (resizing.handle.includes("s")) updates.height = Math.max(10, snapValue(resizing.startH + dy));
+      if (resizing.handle.includes("w")) {
+        updates.width = Math.max(30, snapValue(resizing.startW - dx));
+        updates.x = snapValue(resizing.startEX + dx);
+      }
+      if (resizing.handle.includes("n")) {
+        updates.height = Math.max(10, snapValue(resizing.startH - dy));
+        updates.y = snapValue(resizing.startEY + dy);
+      }
+      onUpdateElement(resizing.id, updates);
+    }
+  }, [dragging, resizing, zoom, canvasRef, snapValue, onUpdateElement]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
     setResizing(null);
-  };
+  }, []);
 
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onSelectElement(null);
-    }
-  };
+  const handleDoubleClick = useCallback((id: string) => {
+    const el = elements.find((e) => e.id === id);
+    if (!el || el.type === "divider" || el.type === "pagebreak") return;
+    setEditingId(id);
+  }, [elements]);
+
+  const GRID_SIZE = 10;
 
   return (
     <div
-      ref={canvasRef}
-      className="flex-1 overflow-auto bg-gray-100 relative"
+      className="flex-1 overflow-auto bg-muted/50 relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onClick={handleCanvasClick}
+      onMouseLeave={handleMouseUp}
+      onClick={() => { if (!dragging && !resizing) onSelectElement(null); }}
     >
-      {/* Canvas Grid Background */}
       <div
-        className="absolute inset-0"
+        className="relative mx-auto my-8"
         style={{
-          backgroundImage: `
-            linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-            linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-          `,
-          backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-        }}
-      />
-
-      {/* Canvas Paper */}
-      <div
-        className="relative bg-white shadow-lg mx-auto my-8"
-        style={{
-          width: `${794 * zoom}px`, // A4 width in pixels
-          minHeight: `${1123 * zoom}px`, // A4 height in pixels
+          width: PAGE_WIDTH * zoom,
+          height: PAGE_HEIGHT * zoom,
           transform: `translate(${pan.x}px, ${pan.y}px)`,
         }}
       >
-        {/* Render Elements */}
-        {elements.map((element) => (
-          <CanvasElementComponent
-            key={element.id}
-            element={element}
-            isSelected={selectedElement === element.id}
-            zoom={zoom}
-            onMouseDown={(e) => handleMouseDown(e, element.id)}
-            onUpdate={(updates) => onUpdateElement(element.id, updates)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface CanvasElementComponentProps {
-  element: CanvasElement;
-  isSelected: boolean;
-  zoom: number;
-  onMouseDown: (e: React.MouseEvent) => void;
-  onUpdate: (updates: Partial<CanvasElement>) => void;
-}
-
-function CanvasElementComponent({
-  element,
-  isSelected,
-  zoom,
-  onMouseDown,
-  onUpdate,
-}: CanvasElementComponentProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
-  };
-
-  const handleBlur = () => {
-    setIsEditing(false);
-  };
-
-  const handleContentChange = (value: string) => {
-    onUpdate({ content: value });
-  };
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
-
-  const style: React.CSSProperties = {
-    position: 'absolute',
-    left: `${element.x * zoom}px`,
-    top: `${element.y * zoom}px`,
-    width: `${element.width * zoom}px`,
-    height: element.type === 'text' ? 'auto' : `${element.height * zoom}px`,
-    minHeight: `${element.height * zoom}px`,
-    fontSize: `${(element.style?.fontSize || 14) * zoom}px`,
-    fontWeight: element.style?.fontWeight || 'normal',
-    color: element.style?.color || '#000000',
-    backgroundColor: element.style?.backgroundColor || 'transparent',
-    border: isSelected ? '2px solid #3b82f6' : element.style?.borderWidth ? `${element.style.borderWidth}px solid ${element.style.borderColor || '#ccc'}` : 'none',
-    padding: `${(element.style?.padding || 4) * zoom}px`,
-    cursor: isEditing ? 'text' : 'move',
-    userSelect: isEditing ? 'text' : 'none',
-  };
-
-  return (
-    <div
-      style={style}
-      onMouseDown={isEditing ? undefined : onMouseDown}
-      onDoubleClick={handleDoubleClick}
-      className={`${isSelected ? 'ring-2 ring-blue-400' : ''} transition-shadow`}
-    >
-      {isEditing ? (
-        element.type === 'text' ? (
-          <textarea
-            ref={inputRef as RefObject<HTMLTextAreaElement>}
-            value={element.content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            onBlur={handleBlur}
-            className="w-full h-full bg-transparent border-none outline-none resize-none"
-            style={{ fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit' }}
-          />
-        ) : (
-          <input
-            ref={inputRef as RefObject<HTMLInputElement>}
-            type="text"
-            value={element.content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            onBlur={handleBlur}
-            className="w-full h-full bg-transparent border-none outline-none"
-            style={{ fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit' }}
-          />
-        )
-      ) : (
-        <div className={element.type === 'divider' ? 'w-full h-full' : ''}>
-          {element.type === 'divider' ? (
-            <div className="w-full h-full" style={{ backgroundColor: element.style?.backgroundColor }} />
-          ) : (
-            element.content
+        <div
+          ref={canvasRef}
+          className="bg-white shadow-lg relative"
+          style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, transform: `scale(${zoom})`, transformOrigin: "top left" }}
+        >
+          {/* Grid */}
+          {showGrid && (
+            <svg className="absolute inset-0 pointer-events-none" width={PAGE_WIDTH} height={PAGE_HEIGHT}>
+              <defs>
+                <pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse">
+                  <path d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`} fill="none" stroke="#e5e7eb" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+            </svg>
           )}
-        </div>
-      )}
 
-      {/* Resize Handles */}
-      {isSelected && !isEditing && (
-        <>
-          <div
-            className="absolute -right-1 -bottom-1 w-3 h-3 bg-blue-500 rounded-full cursor-se-resize"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              // Handle resize logic here
-            }}
-          />
-        </>
-      )}
+          {/* Elements */}
+          {elements.map((el) => {
+            const isSelected = selectedElement === el.id;
+            const isEditing = editingId === el.id;
+
+            return (
+              <div
+                key={el.id}
+                className={`absolute group ${el.locked ? "opacity-70" : "cursor-move"} ${isSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
+                style={{
+                  left: el.x,
+                  top: el.y,
+                  width: el.width,
+                  height: el.type === "divider" ? el.height : "auto",
+                  minHeight: el.height,
+                  fontSize: el.style?.fontSize,
+                  fontWeight: el.style?.fontWeight,
+                  fontFamily: el.style?.fontFamily,
+                  color: el.style?.color,
+                  backgroundColor: el.type === "divider" ? el.style?.backgroundColor : el.style?.backgroundColor || "transparent",
+                  borderWidth: el.style?.borderWidth,
+                  borderColor: el.style?.borderColor,
+                  borderStyle: el.style?.borderWidth ? "solid" : undefined,
+                  padding: el.style?.padding,
+                  textAlign: (el.style?.textAlign as React.CSSProperties["textAlign"]) || undefined,
+                  lineHeight: el.style?.lineHeight,
+                  zIndex: isSelected ? 999 : el.layerOrder || 0,
+                }}
+                onMouseDown={(e) => handleMouseDown(e, el.id)}
+                onDoubleClick={() => handleDoubleClick(el.id)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {el.type === "divider" ? null : el.type === "pagebreak" ? (
+                  <div className="border-t-2 border-dashed border-gray-300 text-center text-[10px] text-gray-400 pt-1">
+                    Page Break
+                  </div>
+                ) : el.type === "checkbox" ? (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4" />
+                    {isEditing ? (
+                      <input
+                        className="flex-1 bg-transparent outline-none border-b border-primary"
+                        value={el.content}
+                        onChange={(e) => onUpdateElement(el.id, { content: e.target.value })}
+                        onBlur={() => setEditingId(null)}
+                        onKeyDown={(e) => e.key === "Enter" && setEditingId(null)}
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="text-sm">{el.content}</span>
+                    )}
+                  </label>
+                ) : isEditing ? (
+                  <textarea
+                    className="w-full h-full bg-transparent outline-none border border-primary rounded resize-none"
+                    value={el.content}
+                    onChange={(e) => onUpdateElement(el.id, { content: e.target.value })}
+                    onBlur={() => setEditingId(null)}
+                    autoFocus
+                    style={{ fontSize: "inherit", fontWeight: "inherit", fontFamily: "inherit", color: "inherit", lineHeight: "inherit" }}
+                  />
+                ) : (
+                  <span className="whitespace-pre-wrap">{el.content}</span>
+                )}
+
+                {/* Resize handles */}
+                {isSelected && !el.locked && (
+                  <>
+                    <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-primary border border-white rounded-full cursor-e-resize" onMouseDown={(e) => handleResizeDown(e, el.id, "e")} />
+                    <div className="absolute right-0 -bottom-1 w-2.5 h-2.5 bg-primary border border-white rounded-full cursor-se-resize" onMouseDown={(e) => handleResizeDown(e, el.id, "se")} />
+                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2.5 h-2.5 bg-primary border border-white rounded-full cursor-s-resize" onMouseDown={(e) => handleResizeDown(e, el.id, "s")} />
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
