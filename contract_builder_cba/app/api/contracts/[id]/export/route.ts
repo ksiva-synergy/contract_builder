@@ -26,8 +26,8 @@ export async function POST(
       Number(contract.specialAllowance) +
       Number(contract.uniformAllowance);
 
-    const totalEarnings = contract.otherEarnings.reduce((sum, e) => sum + Number(e.amount), 0);
-    const totalDeductions = contract.deductions.reduce((sum, d) => sum + Number(d.amount), 0);
+    const totalEarnings = contract.otherEarnings.reduce((sum: number, e) => sum + Number(e.amount), 0);
+    const totalDeductions = contract.deductions.reduce((sum: number, d) => sum + Number(d.amount), 0);
 
     const html = `<!DOCTYPE html>
 <html>

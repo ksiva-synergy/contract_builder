@@ -17,8 +17,8 @@ export default function ContractPreview({ contract }: ContractPreviewProps) {
     contract.wageBreakdown.specialAllowance +
     contract.wageBreakdown.uniformAllowance;
 
-  const totalEarnings = contract.otherEarnings.reduce((sum, e) => sum + e.amount, 0);
-  const totalDeductions = contract.deductions.reduce((sum, d) => sum + d.amount, 0);
+  const totalEarnings = contract.otherEarnings.reduce((sum: number, e) => sum + e.amount, 0);
+  const totalDeductions = contract.deductions.reduce((sum: number, d) => sum + d.amount, 0);
 
   return (
     <div className="max-w-4xl mx-auto">
