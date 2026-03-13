@@ -26,8 +26,8 @@ export async function POST(
       Number(contract.specialAllowance) +
       Number(contract.uniformAllowance);
 
-    const totalEarnings = contract.otherEarnings.reduce((sum: number, e) => sum + Number(e.amount), 0);
-    const totalDeductions = contract.deductions.reduce((sum: number, d) => sum + Number(d.amount), 0);
+    const totalEarnings = contract.otherEarnings.reduce((sum: number, e: { amount: unknown }) => sum + Number(e.amount), 0);
+    const totalDeductions = contract.deductions.reduce((sum: number, d: { amount: unknown }) => sum + Number(d.amount), 0);
 
     const html = `<!DOCTYPE html>
 <html>
@@ -100,14 +100,14 @@ export async function POST(
   ${contract.otherEarnings.length > 0 ? `
   <h2>5. Other Earnings</h2>
   <table class="wages">
-    ${contract.otherEarnings.map((e) => `<tr><td>${e.description}</td><td style="text-align:right">${Number(e.amount).toFixed(2)}</td></tr>`).join("")}
+    ${contract.otherEarnings.map((e: { description: string; amount: unknown }) => `<tr><td>${e.description}</td><td style="text-align:right">${Number(e.amount).toFixed(2)}</td></tr>`).join("")}
     <tr class="total"><td>Total</td><td style="text-align:right">USD ${totalEarnings.toFixed(2)}</td></tr>
   </table>` : ""}
 
   ${contract.deductions.length > 0 ? `
   <h2>${contract.otherEarnings.length > 0 ? "6" : "5"}. Deductions</h2>
   <table class="wages">
-    ${contract.deductions.map((d) => `<tr><td>${d.description}</td><td style="text-align:right">${Number(d.amount).toFixed(2)}</td></tr>`).join("")}
+    ${contract.deductions.map((d: { description: string; amount: unknown }) => `<tr><td>${d.description}</td><td style="text-align:right">${Number(d.amount).toFixed(2)}</td></tr>`).join("")}
     <tr class="total"><td>Total</td><td style="text-align:right">USD ${totalDeductions.toFixed(2)}</td></tr>
   </table>` : ""}
 
