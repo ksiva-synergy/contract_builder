@@ -7,7 +7,8 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function getPoolConnectionString() {
-  const url = process.env.DATABASE_URL!;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL environment variable is not set");
   return url.replace(/[?&]schema=[^&]+/, "");
 }
 
@@ -24,9 +25,18 @@ function createPrismaClient() {
   });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
+  return globalForPrisma.prisma;
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return (getPrismaClient() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TransactionClient = Parameters<Extract<Parameters<typeof prisma.$transaction>[0], (...args: any[]) => any>>[0];
+export type TransactionClient = Parameters<Extract<Parameters<PrismaClient["$transaction"]>[0], (...args: any[]) => any>>[0];
