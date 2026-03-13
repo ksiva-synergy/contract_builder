@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 import { sendSigningRequest, sendSignatureComplete } from "@/lib/notifications";
 import { sealContract } from "@/lib/sealing-service";
 import { distributeDocument } from "@/lib/distribution-service";
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       .update(JSON.stringify(contractData))
       .digest("hex");
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const signature = await tx.signature.create({
         data: {
           contractId,

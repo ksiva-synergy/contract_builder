@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     const userId = (session.user as { id: string }).id;
     const ipAddress = request.headers.get("x-forwarded-for") ?? undefined;
 
-    const createdAssignments = await prisma.$transaction(async (tx) => {
+    const createdAssignments = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const results = await Promise.all(
         assignments.map(
           (a: { userId: string; role: "SIGNER" | "REVIEWER"; orderIndex?: number }) =>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     const newStatus = action === "APPROVE" ? "PENDING_SIGNING" : "DRAFT";
     const auditAction = action === "APPROVE" ? "APPROVED" : "RETURNED";
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.contractAssignment.update({
         where: { id: reviewerAssignment.id },
         data: { isCompleted: true, completedAt: new Date() },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ContractStatus } from "@prisma/client";
+import { ContractStatus, Prisma } from "@prisma/client";
 
 const VALID_TRANSITIONS: Record<ContractStatus, ContractStatus[]> = {
   DRAFT: [ContractStatus.PENDING_REVIEW, ContractStatus.CANCELLED],
@@ -72,7 +72,7 @@ export async function PATCH(
     const userId = (session.user as { id: string }).id;
     const ipAddress = request.headers.get("x-forwarded-for") ?? undefined;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updatedContract = await tx.employmentContract.update({
         where: { id },
         data: { status },
