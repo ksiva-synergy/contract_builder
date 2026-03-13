@@ -27,3 +27,6 @@ function createPrismaClient() {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TransactionClient = Parameters<Extract<Parameters<typeof prisma.$transaction>[0], (...args: any[]) => any>>[0];

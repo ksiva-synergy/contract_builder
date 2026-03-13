@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { prisma, TransactionClient } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
@@ -107,7 +106,7 @@ export async function POST(
       .update(JSON.stringify(contractData))
       .digest("hex");
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
       const signature = await tx.signature.create({
         data: {
           contractId: assignment.contractId,
